@@ -34,7 +34,7 @@ pinentry_cmd_handler_t pinentry_cmd_handler = mac_cmd_handler;
 
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
-	[[NSUserDefaults standardUserDefaults] addSuiteNamed:@"org.gpgtools.common"];
+	[[NSUserDefaults standardUserDefaults] addSuiteNamed:@"cc.logicer.gpgtools.common"];
 	[[NSUserDefaults standardUserDefaults] registerDefaults:@{@"UseKeychain": @YES}];
 
 	if (pinentry_loop()) {

@@ -23,7 +23,7 @@
 #import "KeychainSupport.h"
 
 #define GPG_SERVICE_NAME "GnuPG"
-
+#define OPERATION_PROMPT "Access the passphrase stored in your keychain"
 
 BOOL storePassphraseInKeychain(NSString *fingerprint, NSString *passphrase, NSString *label) {
 	OSStatus status;
@@ -58,19 +58,37 @@ BOOL storePassphraseInKeychain(NSString *fingerprint, NSString *passphrase, NSSt
 
 
 	if (encodedPassphrase) {
+		SecAccessControlCreateFlags flags;
+		// if (@available(macOS 10.15, *)) {
+			flags = kSecAccessControlUserPresence;//kSecAccessControlWatch | kSecAccessControlDevicePasscode | kSecAccessControlOr;
+			// } else {
+			// 	flags = kSecAccessControlDevicePasscode;
+			// 	}
+		CFErrorRef error = nil;
+		SecAccessControlRef access = SecAccessControlCreateWithFlags(NULL, kSecAttrAccessibleAfterFirstUnlock, 0, &error);
+
+		NSLog(@"b: %@, %@", (__bridge NSError*)error, (__bridge id)access);
+
 		NSDictionary *attributesDict = @{(NSString *)kSecClass: (NSString *)kSecClassGenericPassword,
 										 (NSString *)kSecAttrService: @GPG_SERVICE_NAME,
 										 (NSString *)kSecAttrAccount: fingerprint,
 										 (NSString *)kSecValueData: encodedPassphrase,
 										 (NSString *)kSecAttrLabel: label,
+										 (NSString *)kSecAttrAccessControl: (__bridge id)access,
+										 (NSString *)kSecUseDataProtectionKeychain: @(YES),
+										//  (NSString *)kSecAttrAccessGroup: @"VLQJLG8QPN.cc.logicer.gpgtools.pinentry-mac",
 										 (NSString *)kSecUseKeychain: (__bridge id)keychainRef};
 		CFDictionaryRef attributes = (__bridge CFDictionaryRef)attributesDict;
 
 
 		status = SecItemUpdate(query, attributes);
+		NSLog(@"a: %@, %@", SecCopyErrorMessageString(status, NULL), attributesDict);
 		if (status == errSecItemNotFound) {
 			status = SecItemAdd(attributes, nil);
+		NSLog(@"a: %@", SecCopyErrorMessageString(status, NULL));
 		}
+
+		CFRelease(access);
 	} else {
 		status = SecItemCopyMatching(query, (CFTypeRef *)&itemRef);
 		if (status == errSecSuccess) {
@@ -100,6 +118,8 @@ NSString *getPassphraseFromKeychain(NSString *fingerprint, BOOL *keychainUnusabl
 								fingerprint, kSecAttrAccount,
 								kCFBooleanFalse, kSecReturnData,
 								keychainRef, kSecUseKeychain,
+								@OPERATION_PROMPT, kSecUseOperationPrompt,
+								true, kSecUseDataProtectionKeychain,
 								nil];
 
 	int status1 = SecItemCopyMatching((__bridge CFDictionaryRef)attributes, nil);
@@ -112,6 +132,7 @@ NSString *getPassphraseFromKeychain(NSString *fingerprint, BOOL *keychainUnusabl
 								fingerprint, kSecAttrAccount,
 								kCFBooleanTrue, kSecReturnData,
 								keychainRef, kSecUseKeychain,
+								@OPERATION_PROMPT, kSecUseOperationPrompt,
 								nil];
 	CFTypeRef passphraseData = nil;
 
